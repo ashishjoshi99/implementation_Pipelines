@@ -13,11 +13,12 @@ To allow non-technical folks (Data Analysts, Business Users) to configure data p
 ## How to use
 
 1. Define a YAML configuration (see `configs/sample_pipeline.yaml` for reference).
-2. Execute the runner via command line or configure it in a Databricks Job as a Python task:
+2. **In Databricks (Recommended for non-technical users):**
+   - Open the `run_pipeline.py` notebook in Databricks.
+   - Enter the path to your YAML configuration in the text box widget at the top.
+   - Click "Run All". 
+   - *To schedule this*: Create a Databricks Workflow (Job), select the `run_pipeline` notebook, and provide the `config_file` parameter directly in the Jobs UI.
 
-```bash
-python main.py --config configs/sample_pipeline.yaml
-```
 
 ## Available Configurations
 

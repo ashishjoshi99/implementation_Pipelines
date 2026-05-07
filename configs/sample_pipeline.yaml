@@ -1,93 +1,72 @@
 pipelines:
-  # ----------------------------------------------------
-  # Pipeline 1: Clean, Tokenize, and Hash Bronze Customers
-  # ----------------------------------------------------
-  - name: "Customer Data Cleansing"
+  - name: "Northwind Customer Data Cleansing"
     source:
-      table: "sandbox.bronze.raw_customers"
+      table: "northwind.bronze.customers"
       
     target:
-      table: "sandbox.silver.cleaned_customers"
+      table: "northwind.silver.customers"
       
-    mode: "scd2" # Keeps track of historical changes for customers
+    mode: "scd2"
     join_keys:
       - "customer_id"
       
     transformations:
-      # 1. Standardize unstructured schema
       - type: "clean_column_names"
       
-      # 2. Drop unused or obsolete columns
       - type: "drop_columns"
         columns: 
-          - "internal_system_id"
-          - "old_address_format"
+          - "fax"
+          - "contact_title"
 
-      # 3. Safely cast string fields to standard types
-      - type: "cast_datatypes"
-        mapping:
-          registration_date: "timestamp"
-          age: "int"
-          
-      # 4. Add date parts for Delta Partitions (Year, Month, Day)
-      - type: "extract_date_parts"
-        column: "registration_date"
-
-      # 5. Handle defaults for missing values natively
       - type: "fill_nulls"
-        columns: ["loyalty_tier", "status"]
-        value: "UNKNOWN"
+        columns: ["region", "postal_code"]
+        value: "N/A"
 
-      # 6. Trim all String columns uniformly across the dataframe
       - type: "trim_strings"
       
-      # 7. Standardize PII domains strictly
-      - type: "clean_email"
-        column: "email_address"
       - type: "clean_phone"
-        column: "phone_number"
+        column: "phone"
         
-      # 8. Mask sensitive financial info, keeping only last 4 digits
-      - type: "mask_data"
-        column: "credit_card_hash"
-        num_chars_to_keep: 4
-        mask_char: "*"
-
-      # 9. Hash a unique surrogate key based on deterministic identity columns
       - type: "hash_columns"
-        columns: ["email_address", "phone_number"]
+        columns: ["company_name", "contact_name"]
         target_column: "customer_identity_hash"
 
-  # ----------------------------------------------------
-  # Pipeline 2: Enrich Orders using SQL Joins
-  # ----------------------------------------------------
-  - name: "Order Enrichment (SQL Join)"
+  - name: "Northwind Order Enrichment (SQL Join)"
     source:
-      table: "sandbox.bronze.raw_orders"
+      table: "northwind.bronze.orders"
       
     target:
-      table: "sandbox.silver.enriched_orders"
+      table: "northwind.silver.enriched_orders"
       
-    mode: "append" # Just appending new orders natively
+    mode: "append"
     
     transformations:
       - type: "clean_column_names"
       
-      # Demo of a SQL Transformation joining multiple inputs!
-      # 'current_df' represents the raw_orders data currently flowing through.
+      - type: "cast_datatypes"
+        mapping:
+          order_date: "timestamp"
+          shipped_date: "timestamp"
+          freight: "double"
+
+      - type: "extract_date_parts"
+        column: "order_date"
+      
       - type: "execute_sql"
         query: >
           SELECT 
             o.order_id,
             o.customer_id,
-            o.order_total,
+            o.employee_id,
+            o.order_date,
+            o.freight,
+            o.ship_country,
             c.customer_identity_hash,
-            c.email_address
+            c.company_name
           FROM current_df o
-          LEFT JOIN sandbox.silver.cleaned_customers c 
+          LEFT JOIN northwind.silver.customers c 
             ON o.customer_id = c.customer_id 
             AND c.is_active = True
             
-      # Stamping execution metadata immediately before load
       - type: "add_ingestion_timestamp"
         column_name: "enriched_at"
